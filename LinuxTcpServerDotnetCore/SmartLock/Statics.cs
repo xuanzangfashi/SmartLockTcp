@@ -23,9 +23,9 @@ namespace LinuxTcpServerDotnetCore.SmartLock.Statics
 
     public enum EDataHeader
     {
-        EInit, EExit, EAppLocation, EPhoneBluetoothDetected,
+        EInit, EGpsTrigger, EGeofencingTrigger, EPhoneBluetoothDetected,
         EBluetoothTagDetected, EDeviceDetected, EHumanCountImg,
-        EFingerprintData, EFaceData, EPinInput, EVoiceInput,
+        EFingerprintData, EFaceData, EPinInput, EVoiceInput, EExit
     }
 
     public enum EFactorState
@@ -59,7 +59,10 @@ namespace LinuxTcpServerDotnetCore.SmartLock.Statics
         public int[] selected_factor;
         public Vector3 lock_location;
         public EFactorState[] factor_state;
+        public EFactorState[] resident_factor_state;//1.Pin 2.fingerprint 3.face_id -------------  index base on 1
+        public EFactorState multiple_human;
     }
+
 
     public static class LightManager
     {
