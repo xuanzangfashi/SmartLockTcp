@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+<SqlUrl>server=106.14.165.8;port=3306;user=test;password=123456; database=beach_smart_lock;</SqlUrl>
+<HttpContentDir>D:/HttpContent/apache/Apache24/htdocs/RUN_Interactive/</HttpContentDir>
+<HttpContentUrl>http://106.14.165.8:5757/</HttpContentUrl>
+<HttpServerIp>http://+:5656/</HttpServerIp>
+<HttpServerName>FloorSwaper/</HttpServerName>
+<ForceGC>true</ForceGC>
+<ForceGCInterval>60000</ForceGCInterval>
+<StreamSizeLimit>5242880</StreamSizeLimit>
+<SingleMemoryBarSize>4096</SingleMemoryBarSize>
+</Root>
