@@ -1,4 +1,14 @@
 # SmartLockTcp
+# 20190730
+  1.根据需求更改process thread 的逻辑
+
+  2.优化成员变量
+
+  3.修改FLockInfo结构体
+
+  4.修改json数据格式
+
+  5.添加 try catch 保证json数据不完整时 服务器不会崩溃
 # 20190726
   1.添加 静态全局类 保存一些常量
 
