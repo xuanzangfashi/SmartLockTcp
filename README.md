@@ -10,7 +10,7 @@
 
   5.添加 try catch 到 process 的 switch 中 保证json数据不完整时 服务器不会崩溃
 
-  6.已经过window .net core 测试
+  6.已经过window .net core 测试 工具(serial tool--Tcp client)
 # 20190726
   1.添加 静态全局类 保存一些常量
 
