@@ -1,14 +1,16 @@
 # SmartLockTcp
 # 20190730
-  1.根据需求更改process thread 的逻辑
+  1.根据需求更改process thread 的逻辑 
 
-  2.优化成员变量
+  2.优化成员变量 删除一些重复的 成员变量 共用同一个 pair ref
 
-  3.修改FLockInfo结构体
+  3.修改FLockInfo结构体 将固定的因素和Multiple human 因素 加入结构体
 
-  4.修改json数据格式
+  4.修改json数据格式 例子：{"type":"0","result":"true"}
 
-  5.添加 try catch 保证json数据不完整时 服务器不会崩溃
+  5.添加 try catch 到 process 的 switch 中 保证json数据不完整时 服务器不会崩溃
+
+  6.已经过window .net core 测试
 # 20190726
   1.添加 静态全局类 保存一些常量
 
