@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace LinuxTcpServerDotnetCore
 {
@@ -34,7 +35,16 @@ namespace LinuxTcpServerDotnetCore
                 byte[] tmp_buffer = new byte[255];
                 if (target_len == 0)
                 {
-                    len = Client.Client.Receive(tmp_buffer, 0, 10, SocketFlags.None);
+                    try
+                    {
+                        len = Client.Client.Receive(tmp_buffer, 0, 10, SocketFlags.None);
+                    }
+                    catch(Exception ex)
+                    {
+                        Debuger.PrintStr(ex.Message, EPRINT_TYPE.WARNING);
+                        data = null;
+                        return -1;
+                    }
                     var length_str = Encoding.UTF8.GetString(tmp_buffer);
                     int tmp_targetlen = target_len;
                     if (!int.TryParse(length_str, out target_len))
@@ -53,6 +63,7 @@ namespace LinuxTcpServerDotnetCore
                     data = null;
                     return 0;
                 }
+                
                 Debuger.PrintStr(len.ToString(), EPRINT_TYPE.ERROR);
             } while (target_len - offset > 0);
             target_len = 0;

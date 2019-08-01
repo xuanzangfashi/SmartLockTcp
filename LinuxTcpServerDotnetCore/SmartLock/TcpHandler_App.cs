@@ -21,6 +21,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
         public override void Init(int port, IPAddress ip)
         {
             base.Init(port, ip);
+            this.ConnectThread.Name = "App_Listener";
             this.OnConnectCallback = OnConnect;
         }
 

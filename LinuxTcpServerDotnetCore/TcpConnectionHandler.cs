@@ -1,4 +1,5 @@
-﻿using LinuxTcpServerDotnetCore.SmartLock;
+﻿using Json;
+using LinuxTcpServerDotnetCore.SmartLock;
 using LinuxTcpServerDotnetCore.Statics;
 using System;
 using System.Collections.Generic;
@@ -10,13 +11,15 @@ namespace LinuxTcpServerDotnetCore
 {
     public class TcpConnectionHandler
     {
-        protected Thread ConnectionMainThread;
+        public Thread ConnectionMainThread;
         protected TcpReceiver Receiver;
         public TcpSender Sender;
         public TcpClient Client;
-        protected Semaphore ProcessSema;
+        public Semaphore ProcessSema;
         protected int CurrentSemaCount;
-        protected bool ReceiveZeroDisconnect = false;
+        public bool ReceiveZeroDisconnect = false;
+        public string DisconnectReason = "";
+        public Thread e;
 
         public TcpConnectionHandler(TcpClient client)
         {
@@ -26,6 +29,7 @@ namespace LinuxTcpServerDotnetCore
 
             ConnectionMainThread = new Thread(MainLoop);
             ConnectionMainThread.Start();
+
         }
 
         public TcpConnectionHandler()
@@ -41,30 +45,50 @@ namespace LinuxTcpServerDotnetCore
             this.Client = client;
             ConnectionMainThread = new Thread(MainLoop);
             ConnectionMainThread.Start();
+            client.ReceiveTimeout = 100000000;
         }
 
         protected void MainLoop()
         {
-            while(true)
+            while (true)
             {
-                if (Client.Connected)
+
+                try
                 {
-                    if (ProcessSema.WaitOne(1))
+
+                    if (Client.Connected && !ReceiveZeroDisconnect)
                     {
-                        Thread e = new Thread(ProcessData);
-                        e.Start();
+                        if (ProcessSema.WaitOne(1))
+                        {
+                            Debuger.PrintStr("got sema1", EPRINT_TYPE.NORMAL);
+                            if (Client.Connected && !ReceiveZeroDisconnect) ;
+                            else
+                            {
+                                ProcessSema.Release();
+                                continue;
+                            }
+                            e = new Thread(ProcessData);
+                            e.Name = this as TcpConnectionHandler_SmartLock == null ? "app_recv" : "sl_recv";
+                            e.Start();
+                        }
+                    }
+                    else
+                    {
+                        Debuger.PrintStr("wait for disconnect", EPRINT_TYPE.NORMAL);
+                        ProcessSema.WaitOne();
+                        //ProcessSema.WaitOne();
+                        Debuger.PrintStr("got sema", EPRINT_TYPE.NORMAL);
+
+
+                        Debuger.PrintStr("a handler lost connection", EPRINT_TYPE.WARNING);
+                        SmartLockTcpHandlerManager.Instance.DisconnectTcpConnectionHandler(this, DisconnectReason == "" ? "lost connection!" : DisconnectReason);
+                        break;
                     }
                 }
-                if (!Client.Connected || ReceiveZeroDisconnect)
+                catch (Exception ex)
                 {
-                    ProcessSema.WaitOne();
-                    //ProcessSema.WaitOne();
-                    ProcessSema.Close();
-                    ProcessSema = null;
-
-                    Debuger.PrintStr("a handler lost connection", EPRINT_TYPE.WARNING);
-                    SmartLockTcpHandlerManager.Instance.DisconnectTcpConnectionHandler(this, "lost connection!");
-                    break;
+                    Debuger.PrintStr(ex.Message, EPRINT_TYPE.WARNING);
+                    return;
                 }
             }
         }
@@ -76,14 +100,16 @@ namespace LinuxTcpServerDotnetCore
 
         public void Disconnect(string reason)
         {
+            var jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "1", reason, "200" }).jstr;
+            this.Sender.WriteSendData(jstr);
             Client.Client.Disconnect(false);
             Client.Close();
-            //var jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "1", reason, "200" }).jstr;
-            //this.Sender.WriteSendData(jstr);
+
             this.Sender = null;
             this.Receiver = null;
             this.Client.Dispose();
-
+            ProcessSema.Close();
+            ProcessSema = null;
 
             //ConnectThread.Abort();
             OnDisconnect(reason);

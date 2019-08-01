@@ -4,7 +4,7 @@
 <HttpContentDir>D:/HttpContent/apache/Apache24/htdocs/RUN_Interactive/</HttpContentDir>
 <HttpContentUrl>http://106.14.165.8:5757/</HttpContentUrl>
 <HttpServerIp>http://+:5656/</HttpServerIp>
-<HttpServerName>FloorSwaper/</HttpServerName>
+<HttpServerName>SmartLock/</HttpServerName>
 <ForceGC>true</ForceGC>
 <ForceGCInterval>60000</ForceGCInterval>
 <StreamSizeLimit>5242880</StreamSizeLimit>

@@ -16,11 +16,8 @@ namespace LinuxTcpServerDotnetCore.SmartLock
     {
         public int FailMakeupCount = 0;
         public ETcpHandlerType HandlerType = ETcpHandlerType.ESmartLock;
-
-
         public bool InitDone = false;
         public FSmartLockPair CurrentPair;
-
         public FLockInfo LockInfo;
 
         public TcpConnectionHandler_SmartLock(TcpClient client) : base(client)
@@ -38,6 +35,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
         {
             base.Init(client);
             //Corresponding_App = new List<TcpConnectionHandler_App>();
+            this.ConnectionMainThread.Name = this.GetType().Name;
         }
 
         protected override void ProcessData()
@@ -45,6 +43,8 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             base.ProcessData();
             string receiveData;
             var reLen = Receiver.ReadRecevieData(out receiveData);
+            if (reLen == -1)//reLen==-1 means that Thread.Interrup has been called in somewhere,just return this function end thread
+                return;
             if (reLen > 0)
             {
                 JObject jobj = null;
@@ -79,13 +79,12 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                                 var lock_id = jobj["lock_id"].ToString();
                                 CurrentPair = new FSmartLockPair(false);
                                 CurrentPair.sl = this;
-                                CurrentPair.app_ls = new List<TcpConnectionHandler_App>();
                                 SmartLockTcpHandlerManager.Instance.SmartLockMap.Add(lock_id, CurrentPair);
                                 InitDone = true;
                                 LockInfo = new FLockInfo();
                                 MySqlConnection conn;
                                 string restr;
-                                var reader = SqlWorker.MySqlQuery("beach_smart_lock", "user_data", new string[] { "id","username","phone_id","bluetooth_id","device_id","fingerprint_data","face_data","pin","selected_factor","lock_location"
+                                var reader = SqlWorker.MySqlQuery("beach_smart_lock", "user_data", new string[] { "id","phone_id","bluetooth_id","device_id","pin","selected_factor","lock_location"
                             }, "lock_id", lock_id, out conn, out restr);
                                 if (reader != null)
                                 {
@@ -93,18 +92,33 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                                     {
                                         LockInfo.id = reader.GetString("id");
                                         LockInfo.lock_id = lock_id;
-                                        LockInfo.username = reader.GetString("username");
                                         LockInfo.phone_id = reader.GetString("phone_id").Split(',');
                                         LockInfo.bluetooth_id = reader.GetString("bluetooth_id").Split(',');
                                         LockInfo.device_id = reader.GetString("device_id").Split(',');
-                                        LockInfo.fingerprint_data = reader.GetString("fingerprint_data").Split(',');
-                                        LockInfo.face_data = reader.GetString("face_data").Split(',');
                                         LockInfo.pin = reader.GetString("pin");
-                                        var tmp = reader.GetString("selected_factor").Split(',');
-                                        LockInfo.selected_factor = new int[tmp.Length];
+                                        var tmp = reader.GetString("selected_factor").Split('|');
+                                        LockInfo.selected_factor = new int[tmp.Length][];
+                                        LockInfo.factor_state = new EFactorState[tmp.Length][];
                                         for (int i = 0; i < tmp.Length; i++)
                                         {
-                                            LockInfo.selected_factor[i] = int.Parse(tmp[i]);
+                                            var tmp_1 = tmp[i].Split(',');
+                                            LockInfo.selected_factor[i] = new int[tmp_1.Length];
+                                            LockInfo.factor_state[i] = new EFactorState[5];
+                                            for (int j = 0; j < tmp_1.Length; j++)
+                                            {
+                                                LockInfo.selected_factor[i][j] = int.Parse(tmp_1[i]);
+                                                for (int k = 0; k < LockInfo.factor_state[i].Length; k++)
+                                                {
+                                                    if (k == LockInfo.selected_factor[i][j])
+                                                    {
+                                                        LockInfo.factor_state[i][k] = EFactorState.EUndetected;
+                                                    }
+                                                    else
+                                                    {
+                                                        LockInfo.factor_state[i][k] = EFactorState.EUnSelected;
+                                                    }
+                                                }
+                                            }
                                         }
                                         float x, y, z;
                                         var tmp1 = reader.GetString("lock_location").Split(',');
@@ -112,24 +126,10 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                                         y = float.Parse(tmp1[1]);
                                         z = float.Parse(tmp1[2]);
                                         LockInfo.lock_location = new System.Numerics.Vector3(x, y, z);
-                                        LockInfo.factor_state = new EFactorState[5];
+
                                         LockInfo.resident_factor_state = new EFactorState[] { EFactorState.EUnSelected, EFactorState.EUnSelected, EFactorState.EUnSelected };
-                                        LockInfo.multiple_human = EFactorState.ESuccess;
-                                        for (var i = 0; i < 5; i++)
-                                        {
-                                            foreach (var j in LockInfo.selected_factor)
-                                            {
-                                                if (j == i)
-                                                {
-                                                    LockInfo.factor_state[i] = EFactorState.EUndetected;
-                                                    break;
-                                                }
-                                                else
-                                                {
-                                                    LockInfo.factor_state[i] = EFactorState.EUnSelected;
-                                                }
-                                            }
-                                        }
+                                        LockInfo.multiple_human = EFactorState.EFail;
+
                                     }
 
                                     reader.Close();
@@ -143,26 +143,16 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                             }
                         case EDataHeader.EPhoneBluetoothDetected:
                             {
-                                if (LockInfo.factor_state[2] == EFactorState.EFail || LockInfo.factor_state[2] == EFactorState.EUndetected)
+                                if (LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][2] == EFactorState.EFail || LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][2] == EFactorState.EUndetected)
                                 {
-                                    bool match = false;
-                                    var rePhone_sn = jobj["phone_id"].ToString();
-                                    foreach (var i in LockInfo.phone_id)
+                                    if (bool.Parse(jobj["result"].ToString()))
                                     {
-                                        if (string.Compare(i, rePhone_sn) == 0)
-                                        {
-                                            match = true;
-                                            break;
-                                        }
-                                    }
-                                    if (match)
-                                    {
-                                        LockInfo.factor_state[2] = EFactorState.ESuccess;
+                                        LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][2] = EFactorState.ESuccess;
                                         jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "3", "2 pass", "200" });
                                     }
                                     else
                                     {
-                                        LockInfo.factor_state[2] = EFactorState.EFail;
+                                        LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][2] = EFactorState.EFail;
                                         jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "3", "2 fail", "200" });
                                     }
 
@@ -171,26 +161,16 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                             break;
                         case EDataHeader.EBluetoothTagDetected:
                             {
-                                if (LockInfo.factor_state[3] == EFactorState.EFail || LockInfo.factor_state[3] == EFactorState.EUndetected)
+                                if (LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][3] == EFactorState.EFail || LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][3] == EFactorState.EUndetected)
                                 {
-                                    bool match = false;
-                                    var reBluetoothTag = jobj["bluetooth_tag"].ToString();
-                                    foreach (var i in LockInfo.bluetooth_id)
+                                    if (bool.Parse(jobj["result"].ToString()))
                                     {
-                                        if (string.Compare(i, reBluetoothTag) == 0)
-                                        {
-                                            match = true;
-                                            break;
-                                        }
-                                    }
-                                    if (match)
-                                    {
-                                        LockInfo.factor_state[3] = EFactorState.ESuccess;
+                                        LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][3] = EFactorState.ESuccess;
                                         jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "4", "3 pass", "200" });
                                     }
                                     else
                                     {
-                                        LockInfo.factor_state[3] = EFactorState.EFail;
+                                        LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][3] = EFactorState.EFail;
                                         jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "4", "3 fail", "200" });
                                     }
                                 }
@@ -198,26 +178,16 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                             break;
                         case EDataHeader.EDeviceDetected:
                             {
-                                if (LockInfo.factor_state[4] == EFactorState.EFail || LockInfo.factor_state[4] == EFactorState.EUndetected)
+                                if (LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][4] == EFactorState.EFail || LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][4] == EFactorState.EUndetected)
                                 {
-                                    bool match = false;
-                                    var reDeviceId = jobj["device_id"].ToString();
-                                    foreach (var i in LockInfo.device_id)
+                                    if (bool.Parse(jobj["result"].ToString()))
                                     {
-                                        if (string.Compare(i, reDeviceId) == 0)
-                                        {
-                                            match = true;
-                                            break;
-                                        }
-                                    }
-                                    if (match)
-                                    {
-                                        LockInfo.factor_state[4] = EFactorState.ESuccess;
+                                        LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][4] = EFactorState.ESuccess;
                                         jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "5", "4 pass", "200" });
                                     }
                                     else
                                     {
-                                        LockInfo.factor_state[4] = EFactorState.EFail;
+                                        LockInfo.factor_state[CurrentPair.app.CurrentPhoneIndex][4] = EFactorState.EFail;
                                         jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "5", "4 fail", "200" });
                                     }
                                 }
@@ -225,26 +195,16 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                             break;
                         case EDataHeader.EHumanCountImg:
                             {
-                                //if (LockInfo.multiple_human == EFactorState.EFail)
-                                //    break;
-                                var img_data = jobj["raw_img"].ToString();
-                                byte[] raw_img = Encoding.ASCII.GetBytes(img_data);
-                                FileStream fs = new FileStream("D:/human_count_imgs/" + Guid.NewGuid().ToString(), FileMode.Create);
-                                BinaryWriter bw = new BinaryWriter(fs);
-                                bw.Write(raw_img);
-                                bw.Close();
-                                fs.Close();
-                                Random random = new Random();
-                                var tmp = random.Next(1, 100);
-                                if (tmp > 80)
+
+                                if (bool.Parse(jobj["result"].ToString()))
                                 {
                                     LockInfo.multiple_human = EFactorState.ESuccess;
-                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "6", "5 fail", "200" });
+                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "6", "5 pass", "200" });
                                 }
                                 else
                                 {
                                     LockInfo.multiple_human = EFactorState.EFail;
-                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "6", "5 pass", "200" });
+                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "6", "5 fail", "200" });
                                 }
                             }
                             break;
@@ -274,12 +234,12 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                                 if (bool.Parse(img_result))
                                 {
                                     LockInfo.resident_factor_state[2] = EFactorState.ESuccess;
-                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "8", "7 fail", "200" });
+                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "8", "7 pass", "200" });
                                 }
                                 else
                                 {
                                     LockInfo.resident_factor_state[2] = EFactorState.EFail;
-                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "8", "7 pass", "200" });
+                                    jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result", "state" }, new string[] { "8", "7 fail", "200" });
                                 }
                             }
                             break;
@@ -314,27 +274,22 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                                 }
                             }
                             break;
+
                     }
 
-                    
+
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Debuger.PrintStr(ex.Message, EPRINT_TYPE.ERROR);
                     jstr = JsonWorker.MakeSampleJson(new string[] { "type", "result" }, new string[] { ((int)header).ToString(), "json param not complete!" });
                 }
                 if (jstr != null)
                 {
-                    var light_state = (int)LightManager.GetLightState(LockInfo, FailMakeupCount);
-                    if (LockInfo.multiple_human == EFactorState.ESuccess)
-                        light_state += 100;
-                    jstr.jobj[0]["state"] = new JValue(light_state);
+                    if (CurrentPair.app != null)
+                        CurrentPair.app.Sender.WriteSendData(jstr.jstr);
+                    this.Sender.WriteSendData(jstr.jstr);
 
-                    this.Sender.WriteSendData(jstr.jobj[0].ToString());
-                    foreach (var i in CurrentPair.app_ls)
-                    {
-                        i.Sender.WriteSendData(jstr.jobj[0].ToString());
-                    }
                 }
             }
             else
@@ -345,18 +300,39 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             CurrentSemaCount = ProcessSema.Release();
         }
 
+        public void OnFactorChange()
+        {
+            /*interrupt e thread. and receive will return -1, 
+             * the process function will returned and release Sema another new process thread
+             * and e thread will be start soon*/
+            this.e.IsBackground = true;
+            this.e.Interrupt();
+            Reset();
+            
+            
+        }
+
+        public void Reset()
+        {
+            InitDone = false;
+            FailMakeupCount = 0;
+            LockInfo = default(FLockInfo);
+            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result" }, new string[] { "11", "reset" }).jstr);
+        }
+
 
         protected override void OnDisconnect(string reason)
         {
             Debuger.PrintStr("lock_id: " + LockInfo.lock_id + "____Smartlock Handler disconnect reason: " + reason, EPRINT_TYPE.NORMAL);
             CurrentPair.sl = null;
-            if (CurrentPair.app_ls == null)
+            if (CurrentPair.app == null)
             {
 
             }
-            else if (CurrentPair.sl == null && CurrentPair.app_ls.Count == 0)
+            else
             {
                 CurrentPair = default(FSmartLockPair);
+                SmartLockTcpHandlerManager.Instance.DisconnectTcpConnectionHandler(CurrentPair.app, "Smart lock disconnected!");
                 SmartLockTcpHandlerManager.Instance.SmartLockMap.Remove(LockInfo.lock_id);
             }
         }

@@ -1,4 +1,6 @@
-﻿using LinuxTcpServerDotnetCore.SmartLock;
+﻿using LinuxTcpServerDotnetCore.Http;
+using LinuxTcpServerDotnetCore.Http.HttpHandler;
+using LinuxTcpServerDotnetCore.SmartLock;
 using LinuxTcpServerDotnetCore.Statics;
 using Sql;
 using System;
@@ -9,7 +11,6 @@ namespace LinuxTcpServerDotnetCore
     {
         static void Main(string[] args)
         {
-            SmartLockTcpHandlerManager.CreateInstance();
             LinuxTcpManager.CreateInstance();
 
 
@@ -33,11 +34,26 @@ namespace LinuxTcpServerDotnetCore
                 //Debuger.ExitProgram();
                 //return;
             }
-           
+            if (!HttpListenerManager.Instance.Init())
+            {
+                Debuger.PrintStr("Init HttpListenerManager faild!", EPRINT_TYPE.ERROR);
+                Debuger.ExitProgram();
+                return;
+            }
+            else
+            {
+                Debuger.PrintStr("Init HttpListenerManager done!", EPRINT_TYPE.NORMAL);
+            }
+            Debuger.PrintStr($"Waiting for client request,time:{DateTime.Now.ToString()}", EPRINT_TYPE.NORMAL);
+            if (StaticObjects.IsForceGC)
+            {
+                Debuger.StartForceGC(StaticObjects.ForceGCInterval);
+            }
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_ReceiveCommitMsg>("app_commit");
+            SmartLockTcpHandlerManager.CreateInstance();
 
             while (true)
             {
-
                 switch (Debuger.InputCommand())
                 {
                     case ECOMMAND_TYPE.EXIT:

@@ -10,22 +10,27 @@ namespace LinuxTcpServerDotnetCore.SmartLock.Statics
         EApp, ESmartLock,
     }
 
-    public struct FSmartLockPair
+    public class FSmartLockPair
     {
         public TcpConnectionHandler_SmartLock sl;
-        public List<TcpConnectionHandler_App> app_ls;
+        public TcpConnectionHandler_App app;
         public FSmartLockPair(bool a = false)
         {
             sl = null;
-            app_ls = null;
+            app = null;
         }
+    }
+
+    public enum EHttpCommitMsgType
+    {
+        EFactorChange,
     }
 
     public enum EDataHeader
     {
         EInit, EGpsTrigger, EGeofencingTrigger, EPhoneBluetoothDetected,
         EBluetoothTagDetected, EDeviceDetected, EHumanCountImg,
-        EFingerprintData, EFaceData, EPinInput, EVoiceInput, EExit
+        EFingerprintData, EFaceData, EPinInput, EVoiceInput, ECommitFactor, EExit,
     }
 
     public enum EFactorState
@@ -56,9 +61,9 @@ namespace LinuxTcpServerDotnetCore.SmartLock.Statics
         public string[] fingerprint_data;
         public string[] face_data;
         public string pin;
-        public int[] selected_factor;
+        public int[][] selected_factor;
         public Vector3 lock_location;
-        public EFactorState[] factor_state;
+        public EFactorState[][] factor_state;
         public EFactorState[] resident_factor_state;//1.Pin 2.fingerprint 3.face_id -------------  index base on 1
         public EFactorState multiple_human;
     }
@@ -66,30 +71,30 @@ namespace LinuxTcpServerDotnetCore.SmartLock.Statics
 
     public static class LightManager
     {
-        public static ELightState GetLightState(FLockInfo lockinfo,int makeup_count)
-        {
-            int fail_count = 0;
-            foreach (var i in lockinfo.factor_state)
-            {
-                if (i == EFactorState.EFail || i == EFactorState.EUndetected)
-                {
-                    fail_count++;
-                }
-            }
-            fail_count = Math.Clamp(fail_count, 0, 2);
-            fail_count -= makeup_count;
-            if (fail_count >= 2)
-            {
-                return ELightState.ERed;
-            }
-            else if (fail_count == 1)
-            {
-                return ELightState.EOrange;
-            }
-            else
-            {
-                return ELightState.EGreen;
-            }
-        }
+        //public static ELightState GetLightState(FLockInfo lockinfo,int makeup_count)
+        //{
+        //    int fail_count = 0;
+        //    foreach (var i in lockinfo.factor_state)
+        //    {
+        //        if (i == EFactorState.EFail || i == EFactorState.EUndetected)
+        //        {
+        //            fail_count++;
+        //        }
+        //    }
+        //    fail_count = Math.Clamp(fail_count, 0, 2);
+        //    fail_count -= makeup_count;
+        //    if (fail_count >= 2)
+        //    {
+        //        return ELightState.ERed;
+        //    }
+        //    else if (fail_count == 1)
+        //    {
+        //        return ELightState.EOrange;
+        //    }
+        //    else
+        //    {
+        //        return ELightState.EGreen;
+        //    }
+        //}
     }
 }

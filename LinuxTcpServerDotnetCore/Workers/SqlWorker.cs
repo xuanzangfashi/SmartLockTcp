@@ -122,7 +122,7 @@ namespace Sql
             }
         }
 
-        public static bool MySqlEdit(string dataBase, string tableName, string id, string[] keys, string[] values)
+        public static bool MySqlEdit(string dataBase, string tableName, string primary_key_name,string primary_key_value, string[] keys, string[] values)
         {
             if (keys.Length != values.Length)
             {
@@ -140,9 +140,8 @@ namespace Sql
                 }
                 index++;
             }
-            command = command + tmp + " WHERE id = " + id;
-            using (var conn = new MySqlConnection(StaticObjects.SqlUrl
-))
+            command = command + tmp + " WHERE " + primary_key_name + " = " + "\"" + primary_key_value + "\"";
+            using (var conn = new MySqlConnection(StaticObjects.SqlUrl))
             {
                 conn.Open();
                 MySqlCommand CMD = new MySqlCommand(command, conn);
