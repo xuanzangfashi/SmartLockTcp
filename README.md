@@ -1,4 +1,8 @@
 # SmartLockTcp
+# Branch 20190805 20190805
+  1.添加 HttpHandlers 为app提交数据
+
+  2.tcp服务器逻辑修改
 # 20190801
   1.添加Http 服务器
 
