@@ -10,7 +10,7 @@ using System.Threading;
 
 namespace LinuxTcpServerDotnetCore.SmartLock
 {
-    public class TcpConnectionHandler_App : TcpConnectionHandler
+    public sealed class TcpConnectionHandler_App : TcpConnectionHandler
     {
         public ETcpHandlerType HandlerType = ETcpHandlerType.EApp;
 
@@ -24,7 +24,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
 
         public TcpConnectionHandler_App(TcpClient client) : base(client)
         {
-
+            
         }
 
         public TcpConnectionHandler_App()
@@ -49,22 +49,65 @@ namespace LinuxTcpServerDotnetCore.SmartLock
 
             if (relen > 0)
             {
-                JObject jobj = JObject.Parse(receiveData);
-                if (jobj == null)
+                #region OLD
+                //JObject jobj = JObject.Parse(receiveData);
+                //if (jobj == null)
+                //{
+                //    Debuger.PrintStr("Parse Json string fail!", EPRINT_TYPE.WARNING);
+                //    return;
+                //}
+                //
+                //
+                //EDataHeader header = (EDataHeader)int.Parse(jobj["type"].ToString());
+                //
+                //JsonObject jstr = null;
+                //
+                //if (jstr != null)
+                //{
+                //    this.Sender.WriteSendData(jstr.jstr);
+                //    CurrentPair.sl.Sender.WriteSendData(jstr.jstr);
+                //}
+                #endregion
+                if(!InitDone)
                 {
-                    Debuger.PrintStr("Parse Json string fail!", EPRINT_TYPE.WARNING);
-                    return;
+                    try
+                    {
+                        JObject jobj = JObject.Parse(receiveData);
+                        var key = jobj["key"].ToString();
+                        var lock_id = jobj["lock_id"].ToString();
+                        if(SmartLockTcpHandlerManager.Instance.SmartLockMap.ContainsKey(lock_id))
+                        {
+                            CurrentPair = SmartLockTcpHandlerManager.Instance.SmartLockMap[lock_id];
+                            CurrentPair.app = this;
+                            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "init done!", "200" }).jstr);
+                        }
+                        else
+                        {
+                            ReceiveZeroDisconnect = true;
+                            DisconnectReason = "votas lock has not connect yet!";
+                            goto ReturnPoint;
+                        }
+                    }
+                    catch
+                    {
+                        ReceiveZeroDisconnect = true;
+                        DisconnectReason = "cannot parse init json string";
+                        goto ReturnPoint;
+                    }
                 }
-
-
-                EDataHeader header = (EDataHeader)int.Parse(jobj["type"].ToString());
-
-                JsonObject jstr = null;
-               
-                if (jstr != null)
+                else
                 {
-                    this.Sender.WriteSendData(jstr.jstr);
-                    CurrentPair.sl.Sender.WriteSendData(jstr.jstr);
+                    if (CurrentPair.sl == null)
+                    {
+                        //this.Sender.WriteSendData();
+                        ReceiveZeroDisconnect = true;
+                        DisconnectReason = JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "votas lock lost connection!", "200" }).jstr;
+                        goto ReturnPoint;
+                    }
+                    else
+                    {
+                        CurrentPair.sl.Sender.WriteSendData(receiveData);
+                    }
                 }
 
             }

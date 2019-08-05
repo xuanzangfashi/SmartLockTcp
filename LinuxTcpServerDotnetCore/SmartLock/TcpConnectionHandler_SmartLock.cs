@@ -14,11 +14,12 @@ namespace LinuxTcpServerDotnetCore.SmartLock
 {
     public class TcpConnectionHandler_SmartLock : TcpConnectionHandler
     {
-        public int FailMakeupCount = 0;
+        //public int FailMakeupCount = 0;
         public ETcpHandlerType HandlerType = ETcpHandlerType.ESmartLock;
         public bool InitDone = false;
         public FSmartLockPair CurrentPair;
-        public FLockInfo LockInfo;
+        public string lock_id;
+        //public FLockInfo LockInfo;
 
         public TcpConnectionHandler_SmartLock(TcpClient client) : base(client)
         {
@@ -47,34 +48,70 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                 return;
             if (reLen > 0)
             {
-                JObject jobj = null;
-                try
-                {
+                #region OLD
+                //JObject jobj = null;
+                //try
+                //{
 
-                    jobj = JObject.Parse(receiveData);
+                //jobj = JObject.Parse(receiveData);
+                //}
+                //catch (Exception ex)
+                //{
+                //jobj = null;
+                //Debuger.PrintStr(ex.Message, EPRINT_TYPE.ERROR);
+                //}
+                //if (jobj == null)
+                //{
+                //Debuger.PrintStr("Parse Json string fail!", EPRINT_TYPE.WARNING);
+                //goto ReturnPoint;
+                //}
+
+
+                ////EDataHeader header = (EDataHeader)int.Parse(jobj["type"].ToString());
+                ////string message_id = jobj["msg_id"].ToString();
+                //JsonObject jstr = null;
+
+
+                //if (jstr != null)
+                //{
+                //if (CurrentPair.app != null)
+                //CurrentPair.app.Sender.WriteSendData(jstr.jstr);
+                //this.Sender.WriteSendData(jstr.jstr);
+
+                //}
+                #endregion
+                if (!InitDone)
+                {
+                    try
+                    {
+                        JObject jobj = JObject.Parse(receiveData);
+                        lock_id = jobj["lock_id"].ToString();
+                        FSmartLockPair pair = new FSmartLockPair();
+                        pair.sl = this;
+                        SmartLockTcpHandlerManager.Instance.SmartLockMap.Add(lock_id, pair);
+                        CurrentPair = pair;
+                        InitDone = true;
+                        this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "init done!", "200" }).jstr);
+                    }
+                    catch
+                    {
+                        ReceiveZeroDisconnect = true;
+                        DisconnectReason = "cannot parse init json string!";
+                        goto ReturnPoint;
+                    }
+
                 }
-                catch (Exception ex)
+                else
                 {
-                    jobj = null;
-                    Debuger.PrintStr(ex.Message, EPRINT_TYPE.ERROR);
-                }
-                if (jobj == null)
-                {
-                    Debuger.PrintStr("Parse Json string fail!", EPRINT_TYPE.WARNING);
-                    goto ReturnPoint;
-                }
-
-
-                EDataHeader header = (EDataHeader)int.Parse(jobj["type"].ToString());
-                //string message_id = jobj["msg_id"].ToString();
-                JsonObject jstr = null;
-                
-                if (jstr != null)
-                {
-                    if (CurrentPair.app != null)
-                        CurrentPair.app.Sender.WriteSendData(jstr.jstr);
-                    this.Sender.WriteSendData(jstr.jstr);
-
+                    //this.Sender.WriteSendData(receiveData);
+                    if(CurrentPair.app == null)
+                    {
+                        this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "none app connect to this unlock pair", "200" }).jstr);
+                    }
+                    else
+                    {
+                        CurrentPair.app.Sender.WriteSendData(receiveData);
+                    }
                 }
             }
             else
@@ -103,15 +140,15 @@ namespace LinuxTcpServerDotnetCore.SmartLock
         public void Reset()
         {
             InitDone = false;
-            FailMakeupCount = 0;
-            LockInfo = default(FLockInfo);
+            //FailMakeupCount = 0;
+            //LockInfo = default(FLockInfo);
             this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result" }, new string[] { "11", "reset" }).jstr);
         }
 
 
         protected override void OnDisconnect(string reason)
         {
-            Debuger.PrintStr("lock_id: " + LockInfo.lock_id + "____Smartlock Handler disconnect reason: " + reason, EPRINT_TYPE.NORMAL);
+            Debuger.PrintStr("lock_id: " + lock_id + "____Smartlock Handler disconnect reason: " + reason, EPRINT_TYPE.NORMAL);
             CurrentPair.sl = null;
             if (CurrentPair.app == null)
             {
@@ -121,7 +158,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             {
                 CurrentPair = default(FSmartLockPair);
                 SmartLockTcpHandlerManager.Instance.DisconnectTcpConnectionHandler(CurrentPair.app, "Smart lock disconnected!");
-                SmartLockTcpHandlerManager.Instance.SmartLockMap.Remove(LockInfo.lock_id);
+                SmartLockTcpHandlerManager.Instance.SmartLockMap.Remove(lock_id);
             }
         }
         protected override void OnConnect()
