@@ -1,7 +1,9 @@
 ﻿using Json;
 using LinuxTcpServerDotnetCore.SmartLock.Statics;
 using LinuxTcpServerDotnetCore.Statics;
+using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
+using Sql;
 using System;
 using System.Net.Sockets;
 using System.Threading;
@@ -34,7 +36,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
         {
             base.Init(client);
             this.ConnectionMainThread.Name = this.GetType().Name;
-            
+
         }
 
         protected override void ProcessData()
@@ -44,7 +46,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             var relen = Receiver.ReadRecevieData(out receiveData);
             if (relen == -1)/*reLen==-1 means that Thread.Interrup has been called in somewhere,just return this function end thread*/
                 return;
-            
+
             if (relen > 0)
             {
                 JObject jobj = JObject.Parse(receiveData);
@@ -56,7 +58,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
 
 
                 EDataHeader header = (EDataHeader)int.Parse(jobj["type"].ToString());
-                
+
                 JsonObject jstr = null;
                 try
                 {
@@ -89,7 +91,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                                     Debuger.PrintStr(ReceiveZeroDisconnect.ToString(), EPRINT_TYPE.NORMAL);
                                     goto ReturnPoint;
 
-                                   // SmartLockTcpHandlerManager.Instance.DisconnectTcpConnectionHandler(tmpPair.app, "Another app instance has connected!");//断开上一个app
+                                    // SmartLockTcpHandlerManager.Instance.DisconnectTcpConnectionHandler(tmpPair.app, "Another app instance has connected!");//断开上一个app
                                     //tmpPair.app = null;
                                 }
                                 tmpPair.app = this;
@@ -215,7 +217,47 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                             break;
                         case EDataHeader.ECommitFactor:
                             {
-                                string[] factors = jobj["factors"].ToString().Split(',');
+                                //string[] factors = jobj["factors"].ToString().Split(',');
+                                var c_phone_id = jobj["phone_id"].ToString();
+                                var c_lock_id = jobj["lock_id"].ToString();
+                                MySqlConnection conn = null;
+                                string sql_re = null;
+                                var reader = SqlWorker.MySqlQuery("beach_smart_lock", "user_data", new string[] { "selected_factor", "phone_id" }, "lock_id", c_lock_id, out conn, out sql_re);
+                                reader.Read();
+                                var selected_factor = reader.GetString(0).Split('|');
+                                var phone_id = reader.GetString(1).Split(',');
+                                reader.Close();
+                                conn.Close();
+                                reader = null;
+                                conn = null;
+                                for (int i = 0; i < phone_id.Length; i++)
+                                {
+                                    if (phone_id[i] == c_phone_id)
+                                    {
+                                        selected_factor[i] = jobj["factors"].ToString();
+                                        SqlWorker.MySqlEdit("beach_smart_lock", "user_data", "lock_id", c_lock_id,
+                                            new string[] { "selected_factor" }, new string[] { string.Join('|', selected_factor) });
+                                        var tmppair = SmartLockTcpHandlerManager.Instance.SmartLockMap[c_lock_id];
+
+                                        /*abort app threads. dotnet core does not support the Abort() function.Interrrut() will throw exception when the thread has been block by socket.receive()*/
+
+                                        if (InitDone)//Phone Connected and it's in unlock process
+                                        {
+                                            ReceiveZeroDisconnect = true;
+                                            DisconnectReason = "factor change,lock thread reset";
+                                            Debuger.PrintStr(ReceiveZeroDisconnect.ToString(), EPRINT_TYPE.NORMAL);
+                                            //goto ReturnPoint;
+                                        }
+                                        else
+                                        {
+
+                                        }
+
+                                        tmppair.sl.OnFactorChange();
+                                        break;
+                                    }
+                                }
+                                
                             }
                             break;
                     }
@@ -241,7 +283,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             {
                 CurrentSemaCount = ProcessSema.Release();
                 Debuger.PrintStr("release", EPRINT_TYPE.NORMAL);
-                
+
             }
 
         }

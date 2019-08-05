@@ -307,9 +307,12 @@ namespace LinuxTcpServerDotnetCore.SmartLock
              * and e thread will be start soon*/
             this.e.IsBackground = true;
             this.e.Interrupt();
+            ProcessSema.WaitOne();
             Reset();
-            
-            
+            ProcessSema.Release();
+
+
+
         }
 
         public void Reset()

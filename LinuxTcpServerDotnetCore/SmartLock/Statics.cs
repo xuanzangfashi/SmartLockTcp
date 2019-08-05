@@ -30,7 +30,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock.Statics
     {
         EInit, EGpsTrigger, EGeofencingTrigger, EPhoneBluetoothDetected,
         EBluetoothTagDetected, EDeviceDetected, EHumanCountImg,
-        EFingerprintData, EFaceData, EPinInput, EVoiceInput, ECommitFactor, EExit,
+        EFingerprintData, EFaceData, EPinInput, EVoiceInput, ECommitFactor, E, EExit,
     }
 
     public enum EFactorState
