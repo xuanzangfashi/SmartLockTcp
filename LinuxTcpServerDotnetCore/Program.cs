@@ -49,7 +49,15 @@ namespace LinuxTcpServerDotnetCore
             {
                 Debuger.StartForceGC(StaticObjects.ForceGCInterval);
             }
-            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_ReceiveCommitMsg>("app_commit");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_BindVotas>("bind_votas");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_EditDevice>("edit_device");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_EditFactor>("edit_factor");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_Login>("login");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_Register>("register");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetAccountPassword>("reset_account_password");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetVoiceKeyword>("set_voice_keyword");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetVotasPassword>("set_votas_password");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetVotasPassword>("HttpHandler_Logout");
             SmartLockTcpHandlerManager.CreateInstance();
 
             while (true)
