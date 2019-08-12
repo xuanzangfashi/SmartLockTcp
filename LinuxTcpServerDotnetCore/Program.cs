@@ -20,7 +20,7 @@ namespace LinuxTcpServerDotnetCore
             }
             else
             {
-                Debuger.PrintStr("Init StaticObjects faild!", EPRINT_TYPE.ERROR);
+                Debuger.PrintStr("Init StaticObjects failed!", EPRINT_TYPE.ERROR);
                 Debuger.ExitProgram();
                 return;
             }
@@ -30,13 +30,13 @@ namespace LinuxTcpServerDotnetCore
             }
             else
             {
-                //Debuger.PrintStr("Init SqlWorker faild!", EPRINT_TYPE.ERROR);
+                //Debuger.PrintStr("Init SqlWorker failed!", EPRINT_TYPE.ERROR);
                 //Debuger.ExitProgram();
                 //return;
             }
             if (!HttpListenerManager.Instance.Init())
             {
-                Debuger.PrintStr("Init HttpListenerManager faild!", EPRINT_TYPE.ERROR);
+                Debuger.PrintStr("Init HttpListenerManager failed!", EPRINT_TYPE.ERROR);
                 Debuger.ExitProgram();
                 return;
             }
@@ -49,6 +49,8 @@ namespace LinuxTcpServerDotnetCore
             {
                 Debuger.StartForceGC(StaticObjects.ForceGCInterval);
             }
+
+            //create all http request handlers
             HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_BindVotas>("bind_votas");
             HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_EditDevice>("edit_device");
             HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_EditFactor>("edit_factor");
@@ -57,7 +59,7 @@ namespace LinuxTcpServerDotnetCore
             HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetAccountPassword>("reset_account_password");
             HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetVoiceKeyword>("set_voice_keyword");
             HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetVotasPassword>("set_votas_password");
-            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_SetVotasPassword>("HttpHandler_Logout");
+            HttpRequestHandler.CreateHttpRequestHandler<HttpHandler_Logout>("HttpHandler_Logout");
             SmartLockTcpHandlerManager.CreateInstance();
 
             while (true)

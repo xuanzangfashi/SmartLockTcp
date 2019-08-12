@@ -54,18 +54,32 @@ namespace LinuxTcpServerDotnetCore.SmartLock.Statics
     {
         public string id;
         public string lock_id;
-        public string username;
-        public string[] phone_id;
-        public string[] bluetooth_id;
-        public string[] device_id;
-        public string[] fingerprint_data;
-        public string[] face_data;
+        //public string username;
+        public string phone_id;
+        public string bluetooth_id;
+        public string device_id;
+        public FUserInfo[] user_infos;
+        //public string[] fingerprint_data;
+        //public string[] face_data;
+        //public string pin;
+        //public int[][] selected_factor;
+        //public Vector3 lock_location;
+        //public EFactorState[][] factor_state;
+        //public EFactorState[] resident_factor_state;//1.Pin 2.fingerprint 3.face_id -------------  index base on 1
+        //public EFactorState multiple_human;
+    }
+
+    public struct FUserInfo
+    {
+        public string id;
+        public string user_name;
+        public string key;
+        public string bound_lock_id;
+        public string phone_bluetooth;
+        public string bluetooth_tag;
+        public string device_id;
         public string pin;
-        public int[][] selected_factor;
-        public Vector3 lock_location;
-        public EFactorState[][] factor_state;
-        public EFactorState[] resident_factor_state;//1.Pin 2.fingerprint 3.face_id -------------  index base on 1
-        public EFactorState multiple_human;
+
     }
 
 

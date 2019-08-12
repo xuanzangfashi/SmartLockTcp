@@ -52,35 +52,28 @@ namespace LinuxTcpServerDotnetCore
         {
             while (true)
             {
-
                 try
                 {
-
+                    ProcessSema.WaitOne();
                     if (Client.Connected && !ReceiveZeroDisconnect)
                     {
-                        if (ProcessSema.WaitOne(1))
-                        {
-                            Debuger.PrintStr("got sema1", EPRINT_TYPE.NORMAL);
-                            if (Client.Connected && !ReceiveZeroDisconnect) ;
-                            else
-                            {
-                                ProcessSema.Release();
-                                continue;
-                            }
-                            e = new Thread(ProcessData);
-                            e.Name = this as TcpConnectionHandler_SmartLock == null ? "app_recv" : "sl_recv";
-                            e.Start();
-                        }
+                        
+                        Debuger.PrintStr("got sema1", EPRINT_TYPE.NORMAL);
+                        e = new Thread(ProcessData);
+                        e.Name = this as TcpConnectionHandler_SmartLock == null ? "app_recv" : "sl_recv";
+                        e.Start();
                     }
                     else
                     {
                         Debuger.PrintStr("wait for disconnect", EPRINT_TYPE.NORMAL);
-                        ProcessSema.WaitOne();
+                        if (e.IsAlive)
+                        {
+                            e.IsBackground = true;
+                            e.Interrupt();
+                        }
                         //ProcessSema.WaitOne();
-                        Debuger.PrintStr("got sema", EPRINT_TYPE.NORMAL);
-
-
                         Debuger.PrintStr("a handler lost connection", EPRINT_TYPE.WARNING);
+                        ProcessSema.Release();
                         SmartLockTcpHandlerManager.Instance.DisconnectTcpConnectionHandler(this, DisconnectReason == "" ? "lost connection!" : DisconnectReason);
                         break;
                     }

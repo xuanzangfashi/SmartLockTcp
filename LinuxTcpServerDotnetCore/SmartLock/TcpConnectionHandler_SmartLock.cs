@@ -19,7 +19,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
         public bool InitDone = false;
         public FSmartLockPair CurrentPair;
         public string lock_id;
-        //public FLockInfo LockInfo;
+        public FLockInfo LockInfo;
 
         public TcpConnectionHandler_SmartLock(TcpClient client) : base(client)
         {
@@ -45,9 +45,10 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             string receiveData;
             var reLen = Receiver.ReadRecevieData(out receiveData);
             if (reLen == -1)//reLen==-1 means that Thread.Interrup has been called in somewhere,just return this function end thread
-                return;
+                goto ReturnPoint;
             if (reLen > 0)
             {
+                JObject jobj = JObject.Parse(receiveData);
                 #region OLD
                 //JObject jobj = null;
                 //try
@@ -84,14 +85,50 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                 {
                     try
                     {
-                        JObject jobj = JObject.Parse(receiveData);
                         lock_id = jobj["lock_id"].ToString();
                         FSmartLockPair pair = new FSmartLockPair();
                         pair.sl = this;
                         SmartLockTcpHandlerManager.Instance.SmartLockMap.Add(lock_id, pair);
                         CurrentPair = pair;
                         InitDone = true;
-                        this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "init done!", "200" }).jstr);
+                        this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" },
+                            new string[] { "normal", "init done!", "200" }).jstr);
+
+
+                        LockInfo = new FLockInfo();
+
+                        MySqlConnection conn;
+                        string restr;
+
+                        var reader = SqlWorker.MySqlQuery("beach_smart_lock", "lock_data", new string[] { "id"
+                            ,"accounts" }, "lock_id", lock_id, out conn, out restr);
+                        reader.Read();
+                        LockInfo.id = reader.GetString(0);
+                        reader.Close();
+                        conn.Close();
+
+
+                        var accounts = reader.GetString(1).Split(',');
+                        string[] locateColNames = new string[accounts.Length];
+                        for(int i = 0; i < locateColNames.Length; i++)
+                            locateColNames[i] = ("bound_lock_id");
+                        LockInfo.user_infos = new FUserInfo[accounts.Length];
+                        reader = SqlWorker.MySqlLocateQuery("beach_smart_lock", "user_data", new string[] { "id","user_name",
+                        "bound_lock_id","phone_bluetooth","bluetooth_tag","device_id","pin"}, locateColNames, accounts,out conn);
+                        int i_ = 0;
+                        while(reader.Read())
+                        {
+                            LockInfo.user_infos[i_].id = reader.GetString(0);
+                            LockInfo.user_infos[i_].user_name = reader.GetString(1);
+                            LockInfo.user_infos[i_].bound_lock_id = reader.GetString(2);
+                            LockInfo.user_infos[i_].phone_bluetooth = reader.GetString(3);
+                            LockInfo.user_infos[i_].bluetooth_tag= reader.GetString(4);
+                            LockInfo.user_infos[i_].device_id = reader.GetString(5);
+                            LockInfo.user_infos[i_].pin = reader.GetString(6);
+                            i_++;
+                        }
+                        reader.Close();
+                        conn.Close();
                     }
                     catch
                     {
@@ -104,13 +141,89 @@ namespace LinuxTcpServerDotnetCore.SmartLock
                 else
                 {
                     //this.Sender.WriteSendData(receiveData);
-                    if(CurrentPair.app == null)
+                    var to_target = jobj["target"].ToString();
+                    if (to_target == "0")//to server
                     {
-                        this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "none app connect to this unlock pair", "200" }).jstr);
+                        var tag = jobj["tag"].ToString();
+                        var str = jobj["content"].ToString();
+                        switch (tag)
+                        {
+                            case "bluetooth_tag":
+                                {
+                                    foreach(var i in LockInfo.user_infos)
+                                    {
+                                        if(i.bluetooth_tag.IndexOf(str) != -1 && i.user_name == CurrentPair.app.User_name)
+                                        {
+                                            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "true", "200" }).jstr);
+                                            goto ReturnPoint;;
+                                        }
+                                    }
+                                    this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "false", "200" }).jstr);
+                                    goto ReturnPoint;;
+                                }
+                                break;
+                            case "phone_bluetooth":
+                                {
+                                    foreach (var i in LockInfo.user_infos)
+                                    {
+                                        if (i.phone_bluetooth.IndexOf(str) != -1 && i.user_name == CurrentPair.app.User_name)
+                                        {
+                                            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "true", "200" }).jstr);
+                                            goto ReturnPoint;;
+                                        }
+                                    }
+                                    this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "false", "200" }).jstr);
+                                    goto ReturnPoint;;
+                                }
+                                break;
+                            case "device_id":
+                                {
+                                    foreach (var i in LockInfo.user_infos)
+                                    {
+                                        if (i.device_id.IndexOf(str) != -1 && i.user_name == CurrentPair.app.User_name)
+                                        {
+                                            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "true", "200" }).jstr);
+                                            goto ReturnPoint;;
+                                        }
+                                    }
+                                    this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "false", "200" }).jstr);
+                                    goto ReturnPoint;;
+                                }
+                                break;
+                            case "pin":
+                                {
+                                    foreach (var i in LockInfo.user_infos)
+                                    {
+                                        if (i.pin.IndexOf(str) != -1 && i.user_name == CurrentPair.app.User_name)
+                                        {
+                                            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "true", "200" }).jstr);
+                                            goto ReturnPoint;;
+                                        }
+                                    }
+                                    this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type",
+                                            "result","code"}, new string[] { "success", "false", "200" }).jstr);
+                                    goto ReturnPoint;;
+                                }
+                                break;
+                        }
                     }
-                    else
+                    else //to phone
                     {
-                        CurrentPair.app.Sender.WriteSendData(receiveData);
+                        if (CurrentPair.app == null)
+                        {
+                            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "none app connect to this unlock pair", "200" }).jstr);
+                        }
+                        else
+                        {
+                            CurrentPair.app.Sender.WriteSendData(receiveData);
+                        }
                     }
                 }
             }

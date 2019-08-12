@@ -27,10 +27,20 @@ namespace LinuxTcpServerDotnetCore.Http.HttpHandler
                 Debuger.PrintStr(ex.Message, EPRINT_TYPE.ERROR);
                 return JsonWorker.MakeSampleJson(new string[] { "type", "result" }, new string[] { "error", "json string can not be parsed by JObject!" }).jstr;
             }
+            string votas_id = null;
+            string user_name = null;
+            string account_key = null;
+            try
+            {
+                votas_id = jobj["lock_id"].ToString();
+                user_name = jobj["user_name"].ToString();
+                account_key = jobj["key"].ToString();
+            }
+            catch (Exception ex)
+            {
+                return JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "error", ex.Message, "200" }).jstr;
 
-            var votas_id = jobj["lock_id"].ToString();
-            var user_name = jobj["user_name"].ToString();
-            var account_key = jobj["key"].ToString();
+            }
 
             if (SmartLockTcpHandlerManager.Instance.AccountKeys.ContainsKey(user_name))
             {

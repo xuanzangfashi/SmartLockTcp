@@ -20,11 +20,11 @@ namespace LinuxTcpServerDotnetCore.SmartLock
         public bool InitDone = false;
         public string LockId;
         public int CurrentPhoneIndex = -1;
-
+        public string User_name;
 
         public TcpConnectionHandler_App(TcpClient client) : base(client)
         {
-            
+
         }
 
         public TcpConnectionHandler_App()
@@ -45,71 +45,111 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             string receiveData;
             var relen = Receiver.ReadRecevieData(out receiveData);
             if (relen == -1)/*reLen==-1 means that Thread.Interrup has been called in somewhere,just return this function end thread*/
-                return;
+                goto ReturnPoint;
 
             if (relen > 0)
             {
-                #region OLD
-                //JObject jobj = JObject.Parse(receiveData);
-                //if (jobj == null)
-                //{
-                //    Debuger.PrintStr("Parse Json string fail!", EPRINT_TYPE.WARNING);
-                //    return;
-                //}
-                //
-                //
-                //EDataHeader header = (EDataHeader)int.Parse(jobj["type"].ToString());
-                //
-                //JsonObject jstr = null;
-                //
-                //if (jstr != null)
-                //{
-                //    this.Sender.WriteSendData(jstr.jstr);
-                //    CurrentPair.sl.Sender.WriteSendData(jstr.jstr);
-                //}
-                #endregion
-                if(!InitDone)
+                JObject jobj = JObject.Parse(receiveData);
+
+                string key;
+                try
                 {
-                    try
+                    key = jobj["key"].ToString();
+                }
+                catch
+                {
+                    ReceiveZeroDisconnect = true;
+                    DisconnectReason = "cannot parse init json string";
+                    goto ReturnPoint;
+                }
+
+                if (SmartLockTcpHandlerManager.Instance.AccountKeys.ContainsKey(User_name))
+                    if (SmartLockTcpHandlerManager.Instance.AccountKeys[User_name] == key)
                     {
-                        JObject jobj = JObject.Parse(receiveData);
-                        var key = jobj["key"].ToString();
-                        var lock_id = jobj["lock_id"].ToString();
-                        if(SmartLockTcpHandlerManager.Instance.SmartLockMap.ContainsKey(lock_id))
+
+                        #region OLD
+                        //JObject jobj = JObject.Parse(receiveData);
+                        //if (jobj == null)
+                        //{
+                        //    Debuger.PrintStr("Parse Json string fail!", EPRINT_TYPE.WARNING);
+                        //    return;
+                        //}
+                        //
+                        //
+                        //EDataHeader header = (EDataHeader)int.Parse(jobj["type"].ToString());
+                        //
+                        //JsonObject jstr = null;
+                        //
+                        //if (jstr != null)
+                        //{
+                        //    this.Sender.WriteSendData(jstr.jstr);
+                        //    CurrentPair.sl.Sender.WriteSendData(jstr.jstr);
+                        //}
+                        #endregion
+                        if (!InitDone)
                         {
-                            CurrentPair = SmartLockTcpHandlerManager.Instance.SmartLockMap[lock_id];
-                            CurrentPair.app = this;
-                            this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "init done!", "200" }).jstr);
+                            try
+                            {
+                                var lock_id = jobj["lock_id"].ToString();
+                                User_name = jobj["user_name"].ToString();
+                                if (SmartLockTcpHandlerManager.Instance.SmartLockMap.ContainsKey(lock_id))
+                                {
+                                    CurrentPair = SmartLockTcpHandlerManager.Instance.SmartLockMap[lock_id];
+                                    CurrentPair.app = this;
+                                    this.Sender.WriteSendData(JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "init done!", "200" }).jstr);
+                                }
+                                else
+                                {
+                                    ReceiveZeroDisconnect = true;
+                                    DisconnectReason = "votas lock has not connect yet!";
+                                    goto ReturnPoint;
+                                }
+                            }
+                            catch
+                            {
+                                ReceiveZeroDisconnect = true;
+                                DisconnectReason = "cannot parse init json string";
+                                goto ReturnPoint;
+                            }
                         }
                         else
                         {
-                            ReceiveZeroDisconnect = true;
-                            DisconnectReason = "votas lock has not connect yet!";
-                            goto ReturnPoint;
+                            var to_target = jobj["target"].ToString();
+                            if (to_target == "0")//to server
+                            {
+                                var tag = jobj["tag"].ToString();
+                                var str = jobj["content"].ToString();
+
+                            }
+                            else
+                            {
+                                if (CurrentPair.sl == null)
+                                {
+                                    //this.Sender.WriteSendData();
+                                    ReceiveZeroDisconnect = true;
+                                    DisconnectReason = JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "votas lock lost connection!", "200" }).jstr;
+                                    goto ReturnPoint;
+                                }
+                                else
+                                {
+                                    CurrentPair.sl.Sender.WriteSendData(receiveData);
+                                }
+                            }
                         }
-                    }
-                    catch
-                    {
-                        ReceiveZeroDisconnect = true;
-                        DisconnectReason = "cannot parse init json string";
-                        goto ReturnPoint;
-                    }
-                }
-                else
-                {
-                    if (CurrentPair.sl == null)
-                    {
-                        //this.Sender.WriteSendData();
-                        ReceiveZeroDisconnect = true;
-                        DisconnectReason = JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "normal", "votas lock lost connection!", "200" }).jstr;
-                        goto ReturnPoint;
+
                     }
                     else
                     {
-                        CurrentPair.sl.Sender.WriteSendData(receiveData);
+                        ReceiveZeroDisconnect = true;
+                        DisconnectReason = "account key is wrong";
+                        goto ReturnPoint;
                     }
+                else
+                {
+                    ReceiveZeroDisconnect = true;
+                    DisconnectReason = "user has not connect yet!";
+                    goto ReturnPoint;
                 }
-
             }
             else
             {
@@ -124,6 +164,7 @@ namespace LinuxTcpServerDotnetCore.SmartLock
             }
 
         }
+
 
         void SelfProcessingDisconnectThread(object reason)
         {

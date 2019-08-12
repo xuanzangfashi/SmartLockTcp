@@ -27,15 +27,26 @@ namespace LinuxTcpServerDotnetCore.Http.HttpHandler
                 return JsonWorker.MakeSampleJson(new string[] { "type", "result" }, new string[] { "error", "json string can not be parsed by JObject!" }).jstr;
             }
 
-            var user_name = jobj["user_name"].ToString();
-            var password = jobj["password"].ToString();
+
+            string user_name = null;
+            string password = null;
+            try
+            {
+                user_name = jobj["user_name"].ToString();
+                password = jobj["password"].ToString();
+            }
+            catch (Exception ex)
+            {
+                return JsonWorker.MakeSampleJson(new string[] { "type", "result", "code" }, new string[] { "fail", ex.Message, "200" }).jstr;
+
+            }
 
             MySqlConnection conn;
             string restr;
             var reader = SqlWorker.MySqlQuery("beach_smart_lock", "user_data", new string[] { "password" }, "user_name", user_name, out conn, out restr);
-            if(reader.Read())
+            if (reader.Read())
             {
-                if(reader.GetString(0) == password)
+                if (reader.GetString(0) == password)
                 {
                     var guid = Guid.NewGuid().ToString();
                     SmartLockTcpHandlerManager.Instance.AccountKeys.Add(user_name, guid);
