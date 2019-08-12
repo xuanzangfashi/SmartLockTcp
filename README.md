@@ -1,8 +1,23 @@
 # SmartLockTcp
-# Branch 20190805 20190805
+# Branch 20190805 
+# 20190805
   1.添加 HttpHandlers 为app提交数据
-
+  
   2.tcp服务器逻辑修改
+# 20190809
+  1.完成基本框架
+  
+  2.剩余 考虑问题：
+    a.数据安全性
+    
+    b.云端问题
+    
+    c.硬件实际测试
+    
+    d.后期逻辑修改
+# 20190812
+  Smart Lock Sleep
+# Branch Master
 # 20190801
   1.添加Http 服务器
 
